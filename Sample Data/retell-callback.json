@@ -1,0 +1,12 @@
+{
+  "event": "call_ended",
+  "call_status": "ended",
+  "duration_ms": 142000,
+  "recording_url": "https://example.com/demo-recording",
+  "transcript": "Demo call transcript",
+  "metadata": {
+    "lead_id": "demo-lead-001",
+    "appointment_booked": "true",
+    "appointment_time": "2026-10-01T15:00:00Z"
+  }
+}
