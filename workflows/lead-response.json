@@ -1,0 +1,683 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "lead-form",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "f440b3b5-848e-4600-aa1f-e0cc60236d88",
+      "name": "Webhook — Receive Form",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1.1,
+      "position": [
+        -256,
+        96
+      ],
+      "webhookId": "lead-form-webhook"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={ \"success\": true, \"message\": \"We will call you within 30 seconds.\" }",
+        "options": {}
+      },
+      "id": "4238c72c-8b95-4af0-97db-a4d924aa60a9",
+      "name": "Respond to Form",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        -32,
+        -96
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body;\n\nif (!body.phone_number || !body.full_name) {\n  throw new Error('Missing required fields: phone_number and full_name are required');\n}\n\nconst phone = body.phone_number.replace(/\\s+/g, '').replace(/[^+\\d]/g, '');\n\nreturn [{\n  json: {\n    full_name:    body.full_name.trim(),\n    phone_number: phone,\n    email:        body.email ? body.email.trim() : '',\n    source:       body.source || 'website_form',\n    client_id:    body.client_id || null,\n    status:       'new'\n  }\n}];"
+      },
+      "id": "3a0fec27-c3ac-483d-a3c9-a059c8eb87d4",
+      "name": "Code — Validate & Clean Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -32,
+        96
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://YOUR_SUPABASE_PROJECT_REF.supabase.co/rest/v1/leads",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=representation"
+            },
+            {
+              "name": "apikey",
+              "value": "YOUR_SUPABASE_SERVICE_ROLE_KEY"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer YOUR_SUPABASE_SERVICE_ROLE_KEY"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"full_name\": \"{{ $json.full_name }}\",\n  \"phone_number\": \"{{ $json.phone_number }}\",\n  \"email\": \"{{ $json.email }}\",\n  \"source\": \"{{ $json.source }}\",\n  \"client_id\": \"{{ $json.client_id }}\",\n  \"status\": \"new\"\n}",
+        "options": {}
+      },
+      "id": "934be002-73e8-4ae1-9590-8608dc1044a0",
+      "name": "HTTP — Insert Lead to Supabase",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        192,
+        96
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.retellai.com/v2/create-phone-call",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer YOUR_RETELL_API_KEY"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"from_number\": \"YOUR_RETELL_PHONE_NUMBER\",\n  \"to_number\": \"{{ $('Code — Validate & Clean Data').item.json.phone_number }}\",\n  \"agent_id\": \"YOUR_RETELL_AGENT_ID\",\n  \"retell_llm_dynamic_variables\": {\n    \"lead_name\": \"{{ $('Code — Validate & Clean Data').item.json.full_name }}\"\n  },\n  \"metadata\": {\n    \"lead_id\": \"{{ $('HTTP — Insert Lead to Supabase').item.json[0].id }}\",\n    \"lead_name\": \"{{ $('Code — Validate & Clean Data').item.json.full_name }}\",\n    \"client_id\": \"{{ $('Code — Validate & Clean Data').item.json.client_id }}\"\n  }\n}",
+        "options": {}
+      },
+      "id": "8a065e41-adac-44a4-9042-506963996db5",
+      "name": "HTTP — Trigger Retell AI Call",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        416,
+        96
+      ]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://YOUR_SUPABASE_PROJECT_REF.supabase.co/rest/v1/leads?id=eq.{{ $('HTTP — Insert Lead to Supabase').item.json[0].id }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "YOUR_SUPABASE_SERVICE_ROLE_KEY"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer YOUR_SUPABASE_SERVICE_ROLE_KEY"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"status\": \"called\"\n}",
+        "options": {}
+      },
+      "id": "ca57a957-acb2-4c1f-8cb0-096b42602e1a",
+      "name": "HTTP — Update Lead Status to Called",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        640,
+        96
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://YOUR_SUPABASE_PROJECT_REF.supabase.co/rest/v1/call_logs",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "YOUR_SUPABASE_SERVICE_ROLE_KEY"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer YOUR_SUPABASE_SERVICE_ROLE_KEY"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=representation"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"lead_id\": \"{{ $('HTTP — Insert Lead to Supabase').item.json[0].id }}\",\n  \"phone_number_called\": \"{{ $('Code — Validate & Clean Data').item.json.phone_number }}\",\n  \"call_status\": \"initiated\",\n  \"ai_agent_name\": \"YOUR_RETELL_AGENT_ID\",\n  \"call_started_at\": \"{{ $now.toISO() }}\"\n}",
+        "options": {}
+      },
+      "id": "60ead53d-9440-4496-a77b-82b8bc6b8510",
+      "name": "HTTP — Log Call to Supabase",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        848,
+        96
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://YOUR_SUPABASE_PROJECT_REF.supabase.co/rest/v1/analytics_events",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "YOUR_SUPABASE_SERVICE_ROLE_KEY"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer YOUR_SUPABASE_SERVICE_ROLE_KEY"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"lead_id\": \"{{ $('HTTP — Insert Lead to Supabase').item.json[0].id }}\",\n  \"call_log_id\": \"{{ $('HTTP — Log Call to Supabase').item.json[0].id }}\",\n  \"event_type\": \"call_initiated\",\n  \"channel\": \"voice\",\n  \"event_at\": \"{{ $now.toISO() }}\"\n}",
+        "options": {}
+      },
+      "id": "eec6d2c1-9598-48ca-b50b-c232ffa71eda",
+      "name": "HTTP — Log Analytics Event",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        1072,
+        96
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "retell-callback",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "abc44043-5b36-4fd4-b89e-d0ebc0d7ed26",
+      "name": "Webhook — Retell Callback",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1.1,
+      "position": [
+        -256,
+        400
+      ],
+      "webhookId": "retell-callback-webhook"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "condition-1",
+              "leftValue": "={{ $json.body.event }}",
+              "rightValue": "call_ended",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "3078b3e8-d3ba-4503-83e2-55a824e97975",
+      "name": "IF — Call Ended?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -32,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://YOUR_SUPABASE_PROJECT_REF.supabase.co/rest/v1/call_logs?lead_id=eq.{{ $json.body.metadata.lead_id }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "YOUR_SUPABASE_SERVICE_ROLE_KEY"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer YOUR_SUPABASE_SERVICE_ROLE_KEY"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"call_status\": \"{{ $json.body.call_status }}\",\n  \"duration_seconds\": {{ $json.body.duration_ms ? Math.round($json.body.duration_ms / 1000) : 0 }},\n  \"recording_url\": \"{{ $json.body.recording_url || '' }}\",\n  \"transcript\": \"{{ $json.body.transcript || '' }}\",\n  \"call_ended_at\": \"{{ $now.toISO() }}\"\n}",
+        "options": {}
+      },
+      "id": "ae76b246-e53c-478a-bd97-1e002d4f9134",
+      "name": "HTTP — Update Call Log",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        192,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "condition-2",
+              "leftValue": "={{ $('Webhook — Retell Callback').item.json.body.metadata.appointment_booked }}",
+              "rightValue": "true",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "1523d853-e9a5-4bd8-b05a-2a1493192116",
+      "name": "IF — Appointment Booked?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        416,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://YOUR_SUPABASE_PROJECT_REF.supabase.co/rest/v1/appointments",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "YOUR_SUPABASE_SERVICE_ROLE_KEY"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer YOUR_SUPABASE_SERVICE_ROLE_KEY"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=representation"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"lead_id\": \"{{ $('Webhook — Retell Callback').item.json.body.metadata.lead_id }}\",\n  \"title\": \"Sales Appointment\",\n  \"status\": \"scheduled\",\n  \"scheduled_at\": \"{{ $('Webhook — Retell Callback').item.json.body.metadata.appointment_time }}\",\n  \"duration_minutes\": 30,\n  \"calendar_provider\": \"google\",\n  \"notes\": \"Booked via AI voice call\"\n}",
+        "options": {}
+      },
+      "id": "2f005b92-b7c6-4f24-b7b3-8229f9a72567",
+      "name": "HTTP — Save Appointment to Supabase",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        640,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://YOUR_SUPABASE_PROJECT_REF.supabase.co/rest/v1/leads?id=eq.{{ $('Webhook — Retell Callback').item.json.body.metadata.lead_id }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "YOUR_SUPABASE_SERVICE_ROLE_KEY"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer YOUR_SUPABASE_SERVICE_ROLE_KEY"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"status\": \"booked\"\n}",
+        "options": {}
+      },
+      "id": "f8cd8f5c-0c40-4243-916e-e49fc1d6ced6",
+      "name": "HTTP — Update Lead Status to Booked",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        848,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://YOUR_SUPABASE_PROJECT_REF.supabase.co/rest/v1/analytics_events",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "YOUR_SUPABASE_SERVICE_ROLE_KEY"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer YOUR_SUPABASE_SERVICE_ROLE_KEY"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"lead_id\": \"{{ $('Webhook — Retell Callback').item.json.body.metadata.lead_id }}\",\n  \"event_type\": \"appointment_booked\",\n  \"channel\": \"voice\",\n  \"event_at\": \"{{ $now.toISO() }}\"\n}",
+        "options": {}
+      },
+      "id": "6d67f7e0-7a0b-468e-b0d1-0913dad32f9e",
+      "name": "HTTP — Log Booking Analytics",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        1072,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://YOUR_SUPABASE_PROJECT_REF.supabase.co/rest/v1/leads?id=eq.{{ $('Webhook — Retell Callback').item.json.body.metadata.lead_id }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "YOUR_SUPABASE_SERVICE_ROLE_KEY"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer YOUR_SUPABASE_SERVICE_ROLE_KEY"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"status\": \"no_answer\"\n}",
+        "options": {}
+      },
+      "id": "2034ec5a-e8d9-4ec4-84bf-015cb6fbd27d",
+      "name": "HTTP — Update Lead Status to No Answer",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        624,
+        560
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://YOUR_SUPABASE_PROJECT_REF.supabase.co/rest/v1/analytics_events",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "YOUR_SUPABASE_SERVICE_ROLE_KEY"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer YOUR_SUPABASE_SERVICE_ROLE_KEY"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"lead_id\": \"{{ $('Webhook — Retell Callback').item.json.body.metadata.lead_id }}\",\n  \"event_type\": \"call_completed\",\n  \"event_value\": \"no_answer\",\n  \"channel\": \"voice\",\n  \"event_at\": \"{{ $now.toISO() }}\"\n}",
+        "options": {}
+      },
+      "id": "e7472949-ce9a-41eb-8208-844d5e431aa5",
+      "name": "HTTP — Log No Answer Analytics",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        864,
+        560
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook — Receive Form": {
+      "main": [
+        [
+          {
+            "node": "Respond to Form",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Code — Validate & Clean Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code — Validate & Clean Data": {
+      "main": [
+        [
+          {
+            "node": "HTTP — Insert Lead to Supabase",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP — Insert Lead to Supabase": {
+      "main": [
+        [
+          {
+            "node": "HTTP — Trigger Retell AI Call",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP — Trigger Retell AI Call": {
+      "main": [
+        [
+          {
+            "node": "HTTP — Update Lead Status to Called",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP — Update Lead Status to Called": {
+      "main": [
+        [
+          {
+            "node": "HTTP — Log Call to Supabase",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP — Log Call to Supabase": {
+      "main": [
+        [
+          {
+            "node": "HTTP — Log Analytics Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook — Retell Callback": {
+      "main": [
+        [
+          {
+            "node": "IF — Call Ended?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF — Call Ended?": {
+      "main": [
+        [
+          {
+            "node": "HTTP — Update Call Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP — Update Call Log": {
+      "main": [
+        [
+          {
+            "node": "IF — Appointment Booked?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF — Appointment Booked?": {
+      "main": [
+        [
+          {
+            "node": "HTTP — Save Appointment to Supabase",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "HTTP — Update Lead Status to No Answer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP — Save Appointment to Supabase": {
+      "main": [
+        [
+          {
+            "node": "HTTP — Update Lead Status to Booked",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP — Update Lead Status to Booked": {
+      "main": [
+        [
+          {
+            "node": "HTTP — Log Booking Analytics",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP — Update Lead Status to No Answer": {
+      "main": [
+        [
+          {
+            "node": "HTTP — Log No Answer Analytics",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {}
+}
