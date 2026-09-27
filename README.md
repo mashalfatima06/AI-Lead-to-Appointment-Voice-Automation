@@ -165,13 +165,13 @@ This project demonstrates practical experience with:
 
 ## Workflow Preview
 
-![Lead Intake](screenshots/01-lead-intake.png)
+![Lead Intake](screenshots/01-lead-intake.jpeg)
 
-![Call Trigger](screenshots/02-call-trigger.png)
+![Call Trigger](screenshots/02-call-trigger.jpeg)
 
-![Retell Callback](screenshots/03-retell-callback.png)
+![Retell Callback](screenshots/03-retell-callback.jpeg)
 
-![Appointment Routing](screenshots/04-appointment-routing.png)
+![Appointment Routing](screenshots/04-appointment-routing.jpeg)
 
 ## Example Lead Input
 
